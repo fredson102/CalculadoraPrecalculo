@@ -6,14 +6,16 @@ from tkinter import ttk, messagebox, scrolledtext
 import sys
 import os
 
-# Importar el solver avanzado
+# Importar el solver avanzado y AI interpreter
 from advanced_solver import DetailedSolver
+from ai_interpreter import AIInterpreter
 
 
 class CalculadoraGUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.solver = DetailedSolver()
+        self.ai = AIInterpreter()
         self.title("📐 Calculadora Matemática Pro - Soluciones Paso a Paso")
         self.geometry("1400x800")
         self.minsize(1200, 700)
@@ -63,6 +65,27 @@ class CalculadoraGUI(tk.Tk):
         
         tk.Label(left_panel, text="ESCRIBE TU PROBLEMA", font=("Segoe UI", 14, "bold"),
                 fg=self.accent_blue, bg=self.bg_dark).pack(anchor="w", pady=(0, 10))
+        
+        # Indicador de AI
+        ai_frame = tk.Frame(left_panel, bg=self.bg_dark)
+        ai_frame.pack(anchor="w", pady=(0, 5))
+        
+        self.ai_status_label = tk.Label(
+            ai_frame, 
+            text="🤖 AI: " + ("✅ Activa" if self.ai.enabled else "❌ Desactivada (configura API key)"),
+            font=("Segoe UI", 9), 
+            fg=self.accent_green if self.ai.enabled else "#94a3b8", 
+            bg=self.bg_dark
+        )
+        self.ai_status_label.pack(side="left")
+        
+        if not self.ai.enabled:
+            config_btn = tk.Button(
+                ai_frame, text="⚙️ Config", command=self.on_config_ai,
+                font=("Segoe UI", 8), bg="#64748b", fg=self.text_light,
+                bd=0, relief="flat", cursor="hand2", padx=8, pady=2
+            )
+            config_btn.pack(side="left", padx=5)
         
         tk.Label(left_panel, text="Ejemplos: 2x+5=17  |  deriv: x^2  |  x^2-5x+6=0",
                 font=("Segoe UI", 9), fg="#94a3b8", bg=self.bg_dark).pack(anchor="w", pady=(0, 10))
@@ -139,6 +162,15 @@ class CalculadoraGUI(tk.Tk):
             problem_clean = problem_clean.replace("×", "*")  # Reemplazar × por *
             problem_clean = problem_clean.replace("÷", "/")  # Reemplazar ÷ por /
             
+            # Si AI está habilitada, interpretar el problema primero
+            if self.ai.enabled:
+                self.output_text.insert("end", "🤖 Interpretando con AI...\n\n", "info")
+                self.output_text.update()
+                interpreted = self.ai.interpret_problem(problem_clean)
+                if interpreted != problem_clean:
+                    self.output_text.insert("end", f"AI interpretó como: {interpreted}\n\n", "equation")
+                problem_clean = interpreted
+            
             steps, result = self.solver.solve(problem_clean)
             
             # Mostrar pasos con formato
@@ -173,6 +205,64 @@ class CalculadoraGUI(tk.Tk):
         
         self.output_text.config(state="disabled")
         self.output_text.see("1.0")
+    
+    def on_config_ai(self):
+        """Configurar API key de DeepSeek"""
+        config_window = tk.Toplevel(self)
+        config_window.title("⚙️ Configurar AI (DeepSeek)")
+        config_window.geometry("500x350")
+        config_window.configure(bg=self.bg_darker)
+        
+        tk.Label(config_window, text="CONFIGURAR DEEPSEEK AI", 
+                font=("Segoe UI", 16, "bold"), fg=self.accent_blue, bg=self.bg_darker).pack(pady=20)
+        
+        info_frame = tk.Frame(config_window, bg=self.bg_dark, padx=20, pady=15)
+        info_frame.pack(fill="x", padx=20, pady=10)
+        
+        tk.Label(info_frame, text="DeepSeek ofrece API GRATUITA para matemáticas", 
+                font=("Segoe UI", 10, "bold"), fg=self.accent_green, bg=self.bg_dark).pack(anchor="w")
+        tk.Label(info_frame, text="\n1. Visita: https://platform.deepseek.com", 
+                font=("Segoe UI", 9), fg=self.text_light, bg=self.bg_dark).pack(anchor="w")
+        tk.Label(info_frame, text="2. Crea una cuenta gratis", 
+                font=("Segoe UI", 9), fg=self.text_light, bg=self.bg_dark).pack(anchor="w")
+        tk.Label(info_frame, text="3. Ve a API Keys y crea una nueva", 
+                font=("Segoe UI", 9), fg=self.text_light, bg=self.bg_dark).pack(anchor="w")
+        tk.Label(info_frame, text="4. Copia y pega la key aquí:", 
+                font=("Segoe UI", 9), fg=self.text_light, bg=self.bg_dark).pack(anchor="w", pady=(5,10))
+        
+        entry_frame = tk.Frame(config_window, bg=self.bg_darker)
+        entry_frame.pack(fill="x", padx=20)
+        
+        api_entry = tk.Entry(entry_frame, font=("Fira Code", 10), bg="#0b1220", 
+                            fg=self.text_light, insertbackground=self.accent_green, width=50)
+        api_entry.pack(fill="x", pady=5)
+        api_entry.insert(0, self.ai.api_key if self.ai.api_key else "sk-...")
+        
+        def save_key():
+            key = api_entry.get().strip()
+            if key and key != "sk-...":
+                self.ai.set_api_key(key)
+                # Guardar en variable de entorno para la sesión
+                os.environ["DEEPSEEK_API_KEY"] = key
+                self.ai_status_label.config(
+                    text="🤖 AI: ✅ Activa",
+                    fg=self.accent_green
+                )
+                messagebox.showinfo("Éxito", "API key configurada correctamente!\n\nAhora puedes escribir problemas en lenguaje natural.")
+                config_window.destroy()
+            else:
+                messagebox.showwarning("Error", "Por favor ingresa una API key válida")
+        
+        btn_frame = tk.Frame(config_window, bg=self.bg_darker)
+        btn_frame.pack(pady=20)
+        
+        tk.Button(btn_frame, text="✅ Guardar", command=save_key,
+                 font=("Segoe UI", 10, "bold"), bg=self.accent_green, fg="#0b1120",
+                 padx=20, pady=8, bd=0, relief="flat", cursor="hand2").pack(side="left", padx=5)
+        
+        tk.Button(btn_frame, text="❌ Cancelar", command=config_window.destroy,
+                 font=("Segoe UI", 10, "bold"), bg="#64748b", fg=self.text_light,
+                 padx=20, pady=8, bd=0, relief="flat", cursor="hand2").pack(side="left", padx=5)
     
     def on_clear(self):
         """Limpia entrada y salida"""
