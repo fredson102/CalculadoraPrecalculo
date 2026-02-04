@@ -134,7 +134,12 @@ class CalculadoraGUI(tk.Tk):
         self.output_text.delete("1.0", "end")
         
         try:
-            steps, result = self.solver.solve(problem)
+            # Limpiar caracteres problemáticos
+            problem_clean = problem.replace("°", "")  # Eliminar símbolo de grado
+            problem_clean = problem_clean.replace("×", "*")  # Reemplazar × por *
+            problem_clean = problem_clean.replace("÷", "/")  # Reemplazar ÷ por /
+            
+            steps, result = self.solver.solve(problem_clean)
             
             # Mostrar pasos con formato
             for step in steps:
@@ -150,8 +155,21 @@ class CalculadoraGUI(tk.Tk):
             self.output_text.insert("end", f"RESULTADO FINAL: {result}\n", "title")
             self.output_text.insert("end", "="*50 + "\n", "separator")
             
+        except ValueError as e:
+            self.output_text.insert("end", f"❌ Error de formato: {str(e)}\n\n", "info")
+            self.output_text.insert("end", "Verifica que el problema este bien escrito.\n", "info")
+            self.output_text.insert("end", "Ejemplos validos:\n", "info")
+            self.output_text.insert("end", "  - 2x + 5 = 17\n", "step")
+            self.output_text.insert("end", "  - x^2 - 5x + 6 = 0\n", "step")
+            self.output_text.insert("end", "  - deriv: x^3 + 2*x^2\n", "step")
         except Exception as e:
-            self.output_text.insert("end", f"❌ Error: {str(e)}\n", "info")
+            error_msg = str(e)
+            self.output_text.insert("end", f"❌ Error: {error_msg}\n\n", "info")
+            self.output_text.insert("end", "Consejos:\n", "info")
+            self.output_text.insert("end", "  - Usa * para multiplicacion (2*x en vez de 2x)\n", "step")
+            self.output_text.insert("end", "  - Usa ^ para exponentes (x^2 en vez de x²)\n", "step")
+            self.output_text.insert("end", "  - Evita simbolos especiales\n", "step")
+            self.output_text.insert("end", "  - Haz clic en EJEMPLOS para ver formatos validos\n", "step")
         
         self.output_text.config(state="disabled")
         self.output_text.see("1.0")
