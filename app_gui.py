@@ -1,41 +1,81 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
+import re
+from math import factorial, comb as math_comb, perm as math_perm
 
 import sympy as sp
 from sympy.parsing.sympy_parser import (
     parse_expr,
     standard_transformations,
     implicit_multiplication_application,
+    convert_xor,
 )
 from sympy import (
     Symbol, symbols, solve, diff, integrate, limit, summation,
-    expand, factor, simplify, apart, together, cancel,
+    expand, factor, simplify, apart, together, cancel, gcd,
     sin, cos, tan, asin, acos, atan, sinh, cosh, tanh,
     exp, log, sqrt, Abs, Rational, oo, I, pi, E,
-    Matrix
+    Matrix, solveset, roots, degree, Poly, fraction,
+    dsolve, Function, Derivative, series, summation, Product,
+    factorint, divisors, isprime, factorial as sp_factorial,
+    binomial, rf, ff, zeta, polygamma, floor, ceiling
 )
 
-TRANSFORMS = standard_transformations + (implicit_multiplication_application,)
+TRANSFORMS = (standard_transformations + (implicit_multiplication_application, convert_xor))
 
 
 def _show_error(err: Exception):
     messagebox.showerror("Error", str(err))
 
 
+
 def _parse_expression(text: str):
-    """Parsea una expresión matemática"""
+    """Parsea una expresión matemática con símbolos mejorados"""
     try:
-        return parse_expr(text, transformations=TRANSFORMS, evaluate=False)
+        # Reemplazar símbolos matemáticos comunes
+        text = text.replace('π', 'pi').replace('∞', 'oo')
+        text = text.replace('Σ', 'summation').replace('∑', 'summation')
+        text = text.replace('√', 'sqrt').replace('Π', 'Product')
+        text = text.replace('°', '*pi/180')  # Grados a radianes
+        
+        # Permitir notación de potencia sin ^
+        text = re.sub(r'(\w+)\*\*', r'\1**', text)
+        
+        return parse_expr(text, transformations=TRANSFORMS, evaluate=False, local_dict={
+            'sin': sin, 'cos': cos, 'tan': tan,
+            'asin': asin, 'acos': acos, 'atan': atan,
+            'sinh': sinh, 'cosh': cosh, 'tanh': tanh,
+            'exp': exp, 'log': log, 'sqrt': sqrt, 'abs': Abs,
+            'pi': pi, 'e': E, 'E': E, 'I': I,
+            'oo': oo, 'factorial': sp_factorial, 'binomial': binomial,
+            'floor': floor, 'ceiling': ceiling,
+            'summation': summation, 'Product': Product
+        })
     except Exception as e:
-        raise ValueError(f"Expresión inválida: {e}")
+        raise ValueError(f"Expresión inválida: {str(e)[:100]}")
 
 
 def _format_result(expr):
     """Formatea el resultado para visualización"""
     try:
+        if isinstance(expr, (int, float)):
+            return str(expr)
         return sp.pretty(expr, use_unicode=True)
     except Exception:
         return str(expr)
+
+
+def _try_numeric(expr):
+    """Intenta evaluar numéricamente si es posible"""
+    try:
+        if not expr.free_symbols:
+            result = float(sp.N(expr))
+            if result == int(result):
+                return int(result)
+            return round(result, 10)
+    except:
+        pass
+    return None
 
 
 def solve_with_steps(text: str):
@@ -47,199 +87,240 @@ def solve_with_steps(text: str):
     lowered = text.lower().strip()
     steps = []
 
+    # ============ COMANDOS EXPLÍCITOS ============
+    
     # Derivada
-    if lowered.startswith("deriv:") or lowered.startswith("d:"):
+    if lowered.startswith(("deriv:", "d:", "derivative:")):
         expr_text = text.split(":", 1)[1].strip()
         expr = _parse_expression(expr_text)
         x = Symbol("x")
-        steps.append(f"📊 Función original: f(x) = {_format_result(expr)}")
+        steps.append(f"📊 Función: f(x) = {_format_result(expr)}")
         derivative = diff(expr, x)
-        steps.append(f"➜ Derivada: f'(x) = {_format_result(derivative)}")
-        steps.append(f"✓ Usando la regla de potencia y suma")
+        steps.append(f"➜ f'(x) = {_format_result(derivative)}")
+        num = _try_numeric(derivative)
+        if num is not None:
+            steps.append(f"✓ Valor numérico: {num}")
         return "\n".join(steps), derivative
 
     # Integral
-    if lowered.startswith("integral:") or lowered.startswith("∫:"):
+    if lowered.startswith(("integral:", "∫:", "int:")):
         expr_text = text.split(":", 1)[1].strip()
         expr = _parse_expression(expr_text)
         x = Symbol("x")
         steps.append(f"📊 Integrando: {_format_result(expr)}")
-        integral = integrate(expr, x)
-        steps.append(f"➜ Integral indefinida:")
-        steps.append(f"   ∫ {_format_result(expr)} dx = {_format_result(integral)} + C")
-        steps.append(f"✓ Donde C es la constante de integración")
+        try:
+            integral = integrate(expr, x)
+            steps.append(f"➜ ∫ {_format_result(expr)} dx = {_format_result(integral)} + C")
+        except Exception:
+            integral = None
+            steps.append(f"✗ No se puede integrar analíticamente")
         return "\n".join(steps), integral
 
     # Límite
-    if lowered.startswith("lim:") or lowered.startswith("limit:"):
+    if lowered.startswith(("lim:", "limit:")):
         parts = text.split(":", 1)[1].strip()
         try:
             expr_text, point = parts.rsplit(",", 1)
             expr = _parse_expression(expr_text.strip())
             x = Symbol("x")
             point_val = float(point.strip()) if point.strip() != "oo" else oo
-            steps.append(f"📊 Función: {_format_result(expr)}")
-            steps.append(f"➜ Evaluando lím (x → {point.strip()})")
+            steps.append(f"📊 lím (x→{point.strip()}) [{_format_result(expr)}]")
             lim = limit(expr, x, point_val)
-            steps.append(f"✓ Límite = {_format_result(lim)}")
+            steps.append(f"✓ = {_format_result(lim)}")
             return "\n".join(steps), lim
-        except ValueError:
-            raise ValueError("Formato: lim: expr, punto (ej: lim: (x^2-1)/(x-1), 1)")
-
-    # Sumatoria
-    if lowered.startswith("sum:") or lowered.startswith("σ:"):
-        expr_text = text.split(":", 1)[1].strip()
-        expr = _parse_expression(expr_text)
-        n = Symbol("n")
-        steps.append(f"📊 Sumando: {_format_result(expr)}")
-        steps.append(f"➜ Para n desde 1 hasta n")
-        suma = summation(expr, (n, 1, n))
-        steps.append(f"✓ Resultado: {_format_result(suma)}")
-        return "\n".join(steps), suma
+        except Exception as e:
+            raise ValueError("Formato: lim: expr, punto")
 
     # Expandir
     if lowered.startswith("expand:"):
         expr_text = text.split(":", 1)[1].strip()
         expr = _parse_expression(expr_text)
-        steps.append(f"📊 Expresión original: {_format_result(expr)}")
+        steps.append(f"📊 Expandir: {_format_result(expr)}")
         expanded = expand(expr)
-        steps.append(f"➜ Paso: Distribuir términos")
-        steps.append(f"✓ Expandida: {_format_result(expanded)}")
+        steps.append(f"✓ = {_format_result(expanded)}")
         return "\n".join(steps), expanded
 
     # Factorizar
     if lowered.startswith("factor:"):
         expr_text = text.split(":", 1)[1].strip()
         expr = _parse_expression(expr_text)
-        steps.append(f"📊 Expresión original: {_format_result(expr)}")
-        factored = factor(expr)
-        steps.append(f"➜ Buscando factores comunes")
-        steps.append(f"✓ Factorizada: {_format_result(factored)}")
+        steps.append(f"📊 Factorizar: {_format_result(expr)}")
+        try:
+            factored = factor(expr)
+            steps.append(f"✓ = {_format_result(factored)}")
+        except Exception:
+            steps.append(f"✗ No se puede factorizar")
+            factored = expr
         return "\n".join(steps), factored
+
+    # Simplificar
+    if lowered.startswith(("simplify:", "simpl:")):
+        expr_text = text.split(":", 1)[1].strip()
+        expr = _parse_expression(expr_text)
+        steps.append(f"📊 Simplificar: {_format_result(expr)}")
+        simplified = simplify(expr)
+        steps.append(f"✓ = {_format_result(simplified)}")
+        return "\n".join(steps), simplified
 
     # Fracciones parciales
     if lowered.startswith("apart:"):
         expr_text = text.split(":", 1)[1].strip()
         expr = _parse_expression(expr_text)
         x = Symbol("x")
-        steps.append(f"📊 Expresión racional: {_format_result(expr)}")
-        partial = apart(expr, x)
-        steps.append(f"➜ Descomposición en fracciones parciales:")
-        steps.append(f"{_format_result(partial)}")
+        steps.append(f"📊 Descomponer en fracciones parciales:")
+        steps.append(f"   {_format_result(expr)}")
+        try:
+            partial = apart(expr, x)
+            steps.append(f"✓ = {_format_result(partial)}")
+        except Exception:
+            steps.append(f"✗ No se puede descomponer")
+            partial = expr
         return "\n".join(steps), partial
 
-    # Estadística: media
-    if lowered.startswith("mean:"):
+    # Estadística
+    if lowered.startswith(("mean:", "μ:", "media:")):
         data_str = text.split(":", 1)[1].strip()
         try:
             data = [float(x.strip()) for x in data_str.split(",")]
-            steps.append(f"📊 Datos: {data}")
             mean_val = sum(data) / len(data)
-            steps.append(f"➜ Media = (Σx) / n = {sum(data)} / {len(data)}")
-            steps.append(f"✓ μ = {mean_val:.6f}")
+            steps.append(f"📊 Datos: {data}")
+            steps.append(f"➜ μ = (Σx) / n = {sum(data)} / {len(data)}")
+            steps.append(f"✓ μ = {mean_val:.6g}")
             return "\n".join(steps), mean_val
         except ValueError:
             raise ValueError("Formato: mean: 1,2,3,4,5")
 
-    # Estadística: varianza
-    if lowered.startswith("var:"):
+    if lowered.startswith(("var:", "variance:", "σ²:")):
         data_str = text.split(":", 1)[1].strip()
         try:
             data = [float(x.strip()) for x in data_str.split(",")]
-            steps.append(f"📊 Datos: {data}")
             mean_val = sum(data) / len(data)
             variance = sum((x - mean_val)**2 for x in data) / len(data)
-            steps.append(f"➜ Paso 1 - Media: {mean_val:.6f}")
-            steps.append(f"➜ Paso 2 - Σ(x - μ)² = {sum((x - mean_val)**2 for x in data):.6f}")
-            steps.append(f"➜ Paso 3 - Varianza = Σ(x - μ)² / n")
-            steps.append(f"✓ σ² = {variance:.6f}")
+            steps.append(f"📊 Datos: {data}")
+            steps.append(f"➜ Media: {mean_val:.6g}")
+            steps.append(f"➜ σ² = Σ(x - μ)² / n = {variance:.6g}")
             return "\n".join(steps), variance
         except ValueError:
             raise ValueError("Formato: var: 1,2,3,4,5")
 
-    # Estadística: desviación estándar
-    if lowered.startswith("std:"):
+    if lowered.startswith(("std:", "stdev:", "σ:")):
         data_str = text.split(":", 1)[1].strip()
         try:
             data = [float(x.strip()) for x in data_str.split(",")]
-            steps.append(f"📊 Datos: {data}")
             mean_val = sum(data) / len(data)
             variance = sum((x - mean_val)**2 for x in data) / len(data)
             std = variance ** 0.5
-            steps.append(f"➜ Paso 1 - Media: {mean_val:.6f}")
-            steps.append(f"➜ Paso 2 - Varianza: σ² = {variance:.6f}")
-            steps.append(f"➜ Paso 3 - Desv. Est. = √(σ²)")
-            steps.append(f"✓ σ = {std:.6f}")
+            steps.append(f"📊 Datos: {data}")
+            steps.append(f"➜ σ² = {variance:.6g}")
+            steps.append(f"➜ σ = √(σ²) = {std:.6g}")
             return "\n".join(steps), std
         except ValueError:
             raise ValueError("Formato: std: 1,2,3,4,5")
 
-    # Combinatorias: Combinaciones
-    if lowered.startswith("comb:") or lowered.startswith("c("):
+    # Combinatorias
+    if lowered.startswith(("comb:", "c(")):
         try:
             text_clean = text.split(":", 1)[1].strip() if ":" in text else text
             n_str, r_str = text_clean.replace("C(", "").replace(")", "").split(",")
             n, r = int(n_str.strip()), int(r_str.strip())
-            from math import factorial
-            comb = factorial(n) // (factorial(r) * factorial(n - r))
-            steps.append(f"📊 Combinación: C({n},{r})")
-            steps.append(f"➜ Fórmula: C(n,r) = n! / (r!(n-r)!)")
-            steps.append(f"➜ C({n},{r}) = {n}! / ({r}!×{n-r}!)")
-            steps.append(f"✓ Resultado: {comb}")
-            return "\n".join(steps), comb
-        except ValueError:
-            raise ValueError("Formato: comb: n,r (ej: comb: 5,2)")
+            comb_val = binomial(n, r)
+            steps.append(f"📊 C({n},{r}) = {n}! / ({r}! × {n-r}!)")
+            steps.append(f"✓ = {comb_val}")
+            return "\n".join(steps), comb_val
+        except Exception:
+            raise ValueError("Formato: comb: n,r")
 
-    # Combinatorias: Permutaciones
-    if lowered.startswith("perm:") or lowered.startswith("p("):
+    if lowered.startswith(("perm:", "p(")):
         try:
             text_clean = text.split(":", 1)[1].strip() if ":" in text else text
             n_str, r_str = text_clean.replace("P(", "").replace(")", "").split(",")
             n, r = int(n_str.strip()), int(r_str.strip())
-            from math import factorial
-            perm = factorial(n) // factorial(n - r)
-            steps.append(f"📊 Permutación: P({n},{r})")
-            steps.append(f"➜ Fórmula: P(n,r) = n! / (n-r)!")
-            steps.append(f"➜ P({n},{r}) = {n}! / {n-r}!")
-            steps.append(f"✓ Resultado: {perm}")
-            return "\n".join(steps), perm
-        except ValueError:
-            raise ValueError("Formato: perm: n,r (ej: perm: 5,2)")
+            perm_val = factorial(n) // factorial(n - r)
+            steps.append(f"📊 P({n},{r}) = {n}! / {n-r}!")
+            steps.append(f"✓ = {perm_val}")
+            return "\n".join(steps), perm_val
+        except Exception:
+            raise ValueError("Formato: perm: n,r")
 
-    # Ecuación
+    # ============ DETECCIÓN AUTOMÁTICA ============
+
+    # Ecuación (contiene =)
     if "=" in text:
-        left, right = text.split("=", 1)
-        lhs = _parse_expression(left.strip())
-        rhs = _parse_expression(right.strip())
-        steps.append(f"📊 Ecuación: {_format_result(lhs)} = {_format_result(rhs)}")
-        eq = sp.Eq(lhs, rhs)
-        symbols_found = list(eq.free_symbols)
-        if not symbols_found:
-            result = simplify(lhs - rhs)
-            steps.append(f"➜ Simplificando: {_format_result(result)}")
-            return "\n".join(steps), result
-        target = Symbol("x") if Symbol("x") in symbols_found else symbols_found[0]
-        steps.append(f"➜ Resolviendo para: {target}")
-        solutions = solve(eq, target)
-        if not solutions:
-            steps.append(f"✗ Sin soluciones reales")
-            return "\n".join(steps), "Sin soluciones"
-        for i, sol in enumerate(solutions, 1):
-            steps.append(f"✓ Solución {i}: {target} = {_format_result(sol)}")
-        return "\n".join(steps), solutions if len(solutions) > 1 else solutions[0]
+        parts = text.split("=", 1)
+        if len(parts) == 2:
+            left_str, right_str = parts
+            try:
+                lhs = _parse_expression(left_str.strip())
+                rhs = _parse_expression(right_str.strip())
+                eq = sp.Eq(lhs, rhs)
+                symbols_found = list(eq.free_symbols)
+                
+                if not symbols_found:
+                    result = simplify(lhs - rhs)
+                    steps.append(f"📊 {_format_result(lhs)} = {_format_result(rhs)}")
+                    steps.append(f"✓ {_format_result(result)}")
+                    return "\n".join(steps), result
+                
+                # Detectar tipo de ecuación
+                target = Symbol("x") if Symbol("x") in symbols_found else symbols_found[0]
+                
+                # Intentar resolver
+                try:
+                    solutions = solve(eq, target)
+                    if not solutions:
+                        steps.append(f"📊 {_format_result(lhs)} = {_format_result(rhs)}")
+                        steps.append(f"✗ Sin soluciones")
+                        return "\n".join(steps), None
+                    
+                    # Mostrar soluciones
+                    steps.append(f"📊 Resolver para {target}:")
+                    steps.append(f"   {_format_result(lhs)} = {_format_result(rhs)}")
+                    
+                    if len(solutions) == 1:
+                        steps.append(f"✓ {target} = {_format_result(solutions[0])}")
+                        num = _try_numeric(solutions[0])
+                        if num is not None:
+                            steps.append(f"   ≈ {num}")
+                        return "\n".join(steps), solutions[0]
+                    else:
+                        for i, sol in enumerate(solutions, 1):
+                            steps.append(f"✓ Solución {i}: {target} = {_format_result(sol)}")
+                            num = _try_numeric(sol)
+                            if num is not None:
+                                steps.append(f"   ≈ {num}")
+                        return "\n".join(steps), solutions
+                
+                except Exception as e:
+                    steps.append(f"✗ Error al resolver: {str(e)[:50]}")
+                    return "\n".join(steps), None
+                    
+            except Exception as e:
+                raise ValueError(f"Ecuación inválida: {str(e)[:50]}")
 
-    # Simplificar/Evaluar
-    expr = _parse_expression(text)
-    steps.append(f"📊 Expresión: {_format_result(expr)}")
-    simplified = simplify(expr)
-    if simplified != expr:
-        steps.append(f"➜ Simplificada: {_format_result(simplified)}")
-    if not simplified.free_symbols:
-        numerical = float(sp.N(simplified))
-        steps.append(f"✓ Valor: {numerical:.10g}")
-        return "\n".join(steps), numerical
-    steps.append(f"✓ Resultado: {_format_result(simplified)}")
-    return "\n".join(steps), simplified
+    # Expresión matemática simple
+    try:
+        expr = _parse_expression(text)
+        steps.append(f"📊 {_format_result(expr)}")
+        
+        # Si no tiene símbolos, evaluar numéricamente
+        if not expr.free_symbols:
+            result = float(sp.N(expr))
+            if result == int(result):
+                result = int(result)
+            steps.append(f"✓ = {result}")
+            return "\n".join(steps), result
+        
+        # Si tiene símbolos, intentar simplificar
+        simplified = simplify(expr)
+        if simplified != expr:
+            steps.append(f"✓ = {_format_result(simplified)}")
+            return "\n".join(steps), simplified
+        
+        steps.append(f"✓ = {_format_result(expr)}")
+        return "\n".join(steps), expr
+        
+    except Exception as e:
+        raise ValueError(f"No se puede resolver: {str(e)[:60]}")
 
 
 
@@ -388,37 +469,58 @@ class CalculadoraGUI(tk.Tk):
         examples = [
             ("Ecuación lineal", "2x + 5 = 17"),
             ("Ecuación cuadrática", "x^2 - 5x + 6 = 0"),
-            ("Derivada", "deriv: x^3 + 2x^2 - x + 5"),
+            ("Ecuación cúbica", "x^3 - 6x^2 + 11x - 6 = 0"),
+            ("Sistema (múltiples vars)", "2x + y = 5"),
+            ("Derivada simple", "deriv: x^3"),
+            ("Derivada compleja", "deriv: sin(x)*cos(x) + e^x"),
             ("Integral", "integral: x^2 + 2x"),
+            ("Integral trigonométrica", "integral: sin(x)*cos(x)"),
+            ("Límite simple", "lim: (x^2 - 1)/(x - 1), 1"),
+            ("Límite infinito", "lim: 1/x, 0"),
             ("Factorizar", "factor: x^2 - 9"),
-            ("Expandir", "expand: (x + 3)(x - 2)"),
-            ("Límite", "lim: (x^2 - 1)/(x - 1), 1"),
+            ("Factorizar complejo", "factor: x^3 - 8"),
+            ("Expandir", "expand: (x + 3)(x - 2)(x + 1)"),
+            ("Simplificar", "simplify: (x^2 - 1)/(x - 1)"),
             ("Fracciones parciales", "apart: (2x + 3)/(x^2 - 1)"),
             ("Media", "mean: 5,10,15,20,25"),
             ("Varianza", "var: 2,4,6,8,10"),
-            ("Desv. Est.", "std: 3,6,9,12,15"),
-            ("Combinaciones", "comb: 5,2"),
-            ("Permutaciones", "perm: 5,2"),
+            ("Desv. Estándar", "std: 3,6,9,12,15"),
+            ("Combinaciones", "comb: 10,3"),
+            ("Permutaciones", "perm: 10,3"),
             ("Trigonometría", "sin(pi/6) + cos(pi/3)"),
-            ("Logaritmos", "log(100, 10) + log(e)"),
+            ("Logaritmos", "log(100, 10)"),
+            ("Exponenciales", "e^2 + 2^8"),
+            ("Raíces", "sqrt(16) + sqrt(25)"),
+            ("Valor absoluto", "abs(-5) + abs(3)"),
         ]
 
         dialog = tk.Toplevel(self)
         dialog.title("Ejemplos de Problemas")
-        dialog.geometry("500x450")
+        dialog.geometry("600x550")
         dialog.configure(bg="#0b1120")
 
-        ttk.Label(dialog, text="Haz clic en un ejemplo para copiarlo:", style="SubHeader.TLabel").pack(
-            padx=12, pady=12
-        )
+        ttk.Label(
+            dialog,
+            text="Selecciona un ejemplo o escribe tu propio problema",
+            style="SubHeader.TLabel"
+        ).pack(padx=12, pady=12)
 
-        frame = ttk.Frame(dialog)
-        frame.pack(fill="both", expand=True, padx=12, pady=12)
+        # Create scrollable frame
+        canvas = tk.Canvas(dialog, bg="#0b1120", highlightthickness=0)
+        canvas.pack(side="left", fill="both", expand=True, padx=12, pady=12)
+        
+        scrollbar = ttk.Scrollbar(dialog, orient="vertical", command=canvas.yview)
+        scrollbar.pack(side="right", fill="y", pady=12, padx=(0, 12))
+        
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        frame = tk.Frame(canvas, bg="#0b1120")
+        canvas.create_window((0, 0), window=frame, anchor="nw")
 
         for category, example in examples:
             btn = tk.Button(
                 frame,
-                text=f"► {category}: {example}",
+                text=f"► {category}\n   {example}",
                 command=lambda e=example: self._copy_example(e, dialog),
                 bg="#0f172a",
                 fg="#38bdf8",
@@ -429,8 +531,12 @@ class CalculadoraGUI(tk.Tk):
                 padx=12,
                 pady=8,
                 border=0,
+                justify="left"
             )
-            btn.pack(fill="x", pady=2)
+            btn.pack(fill="x", pady=3)
+
+        frame.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
 
     def _copy_example(self, example: str, dialog):
         self.input_text.delete("1.0", "end")
