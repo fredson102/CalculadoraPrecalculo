@@ -31,49 +31,53 @@ jobs:
       - name: Build CalculadoraPro.exe (GUI)
         run: pyinstaller --noconfirm --onefile --windowed --name CalculadoraPro app_gui.py
 
-      - name: Create GitHub Release and Upload EXE
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "Calculadora Matemática Pro ${{ github.ref_name }}"
+          body: |
+            ## 🎉 Calculadora Matemática Pro ${{ github.ref_name }}
+
+            **Soluciones paso a paso tipo Mathway/PhotoMath**
+
+            ### ✨ Características v3.0.0:
+            - ✅ Ecuaciones lineales con pasos detallados (14+ pasos)
+            - ✅ Ecuaciones cuadráticas completas (22+ pasos)
+            - ✅ Derivadas paso a paso (13+ pasos)
+            - ✅ Integrales con explicación
+            - ✅ Límites matemáticos
+            - ✅ Factorización algebraica
+            - ✅ Expansión de expresiones
+            - ✅ Simplificación
+            - ✅ Estadística (media, varianza, desviación estándar)
+            - ✅ GUI profesional moderna con tema oscuro
+            - ✅ 24 ejemplos organizados por categoría
+
+            ### 📥 Descarga:
+            - **CalculadoraPro.exe** - Aplicación GUI completa (Windows 64-bit ~9.7MB)
+
+            ### 🚀 Uso:
+            1. Descarga CalculadoraPro.exe
+            2. Ejecuta el archivo (no requiere instalación)
+            3. Escribe tu problema matemático
+            4. Haz clic en RESOLVER o presiona Ctrl+Enter
+            5. Ve los pasos detallados de la solución
+
+            ### 📚 Ejemplos de uso:
+            ```
+            2x + 5 = 17              → Ecuación lineal
+            x^2 - 5x + 6 = 0         → Ecuación cuadrática
+            deriv: x^3 + 2*x^2       → Derivada
+            integral: x^2 + 3*x      → Integral
+            factor: x^2 - 9          → Factorización
+            mean: 5,10,15,20,25      → Estadística
+            ```
+
+            **No requiere dependencias externas - todo incluido en el EXE**
+          files: dist/CalculadoraPro.exe
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create ${{ github.ref_name }} `
-            --title "Calculadora Matemática Pro ${{ github.ref_name }}" `
-            --notes "## 🎉 Calculadora Matemática Pro ${{ github.ref_name }}
 
-          **Soluciones paso a paso tipo Mathway/PhotoMath**
-
-          ### ✨ Características v3.0.0:
-          - ✅ Ecuaciones lineales con pasos detallados (14+ pasos)
-          - ✅ Ecuaciones cuadráticas completas (22+ pasos)
-          - ✅ Derivadas paso a paso (13+ pasos)
-          - ✅ Integrales con explicación
-          - ✅ Límites matemáticos
-          - ✅ Factorización algebraica
-          - ✅ Expansión de expresiones
-          - ✅ Simplificación
-          - ✅ Estadística (media, varianza, desviación estándar)
-          - ✅ GUI profesional moderna con tema oscuro
-          - ✅ 24 ejemplos organizados por categoría
-
-          ### 📥 Descarga:
-          - **CalculadoraPro.exe** - Aplicación GUI completa (Windows 64-bit ~9.7MB)
-
-          ### 🚀 Uso:
-          1. Descarga CalculadoraPro.exe
-          2. Ejecuta el archivo (no requiere instalación)
-          3. Escribe tu problema matemático
-          4. Haz clic en RESOLVER o presiona Ctrl+Enter
-          5. Ve los pasos detallados de la solución
-
-          ### 📚 Ejemplos de uso:
-          ``````
-          2x + 5 = 17              → Ecuación lineal
-          x^2 - 5x + 6 = 0         → Ecuación cuadrática
-          deriv: x^3 + 2*x^2       → Derivada
-          integral: x^2 + 3*x      → Integral
-          factor: x^2 - 9          → Factorización
-          mean: 5,10,15,20,25      → Estadística
-          ``````
-
-          **No requiere dependencias externas - todo incluido en el EXE**" `
-            dist/CalculadoraPro.exe
 
