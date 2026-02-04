@@ -1,10 +1,1 @@
-numpy
-matplotlib
-sympy
-scipy
-pandas
-pillow
-opencv-python
-pytesseract
-pytest
-rich
+

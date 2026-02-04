@@ -195,4 +195,11 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        print("\n[ERROR] Ha ocurrido un error inesperado:\n")
+        traceback.print_exc()
+        print("\nPresiona ENTER para salir...")
+        input()

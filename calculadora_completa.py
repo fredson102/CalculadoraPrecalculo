@@ -9,50 +9,12 @@ import sys
 from collections import Counter
 import numpy as np
 
-# Intentar importar módulos opcionales
-try:
-    import pytesseract
-    from PIL import Image
-except Exception:
-    pytesseract = None
-    Image = None
 
-# Import demo helpers si existen
-try:
-    from generate_sample_image import generate_sample
-except Exception:
-    generate_sample = None
 
 
 # ---------------------- UTILIDADES ----------------------
 
-def find_tesseract():
-    """Detecta la instalación de Tesseract y configura pytesseract si está presente."""
-    possible_paths = [
-        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-    ]
 
-    try:
-        import subprocess
-        proc = subprocess.run(["tesseract", "--version"], capture_output=True, text=True)
-        if proc.returncode == 0:
-            if pytesseract:
-                pytesseract.pytesseract.tesseract_cmd = "tesseract"
-            return "tesseract"
-    except Exception:
-        pass
-
-    for p in possible_paths:
-        try:
-            with open(p, 'rb'):
-                if pytesseract:
-                    pytesseract.pytesseract.tesseract_cmd = p
-                return p
-        except Exception:
-            continue
-
-    return None
 
 
 # ---------------------- ÁLGEBRA ----------------------
@@ -119,53 +81,6 @@ def sistema_ecuaciones_lineales():
         return None
 
 
-# ---------------------- FUNCIONES ----------------------
-
-def funcion_exponencial():
-    a = float(input("Coeficiente a: "))
-    b = float(input("Base b (b>0, b≠1): "))
-    h = float(input("Desplazamiento horizontal h: "))
-    k = float(input("Desplazamiento vertical k: "))
-    print(f"f(x) = {a}*{b}^(x-{h}) + {k}")
-    for x in np.linspace(-2, 4, 7):
-        y = a * (b ** (x - h)) + k
-        print(f"x={x:.2f} → {y:.4f}")
-
-
-def funcion_logaritmica():
-    a = float(input("Coeficiente a: "))
-    b = float(input("Base b (b>0, b≠1): "))
-    h = float(input("Desplazamiento horizontal h: "))
-    k = float(input("Desplazamiento vertical k: "))
-    start = max(h + 0.1, 0.1)
-    for x in np.linspace(start, start + 5, 6):
-        y = a * math.log(x - h, b) + k
-        print(f"x={x:.2f} → {y:.4f}")
-
-
-# ---------------------- TRIGONOMETRÍA ----------------------
-
-def trigonometria_basica():
-    print("1: Resolver triángulo; 2: Convertir; 3: Valores trig")
-    opcion = input("Selecciona (1-3): ")
-    if opcion == "1":
-        lado1 = float(input("Cateto 1: "))
-        lado2 = float(input("Cateto 2: "))
-        hip = math.sqrt(lado1**2 + lado2**2)
-        ang1 = math.degrees(math.atan2(lado1, lado2))
-        ang2 = 90 - ang1
-        print(f"Hipotenusa={hip:.4f}, ángulos={ang1:.2f}°, {ang2:.2f}°")
-    elif opcion == "2":
-        valor = float(input("Valor: "))
-        tipo = input("Es grados (G) o radianes (R)? ").upper()
-        if tipo == 'G':
-            print(f"{valor}° = {math.radians(valor):.4f} rad")
-        else:
-            print(f"{valor} rad = {math.degrees(valor):.2f}°")
-    else:
-        ang = float(input("Ángulo en grados: "))
-        r = math.radians(ang)
-        print(f"sen={math.sin(r):.4f}, cos={math.cos(r):.4f}, tan={math.tan(r):.4f}")
 
 
 # ---------------------- APLICACIONES ----------------------
@@ -382,24 +297,31 @@ def main():
 # ---------------------- EJECUCIÓN / DEMO ----------------------
 
 if __name__ == '__main__':
-    if '--demo' in sys.argv:
-        print('Demo: OCR → estadísticas (generando imagen de ejemplo)')
-        # Detect tesseract
-        t = find_tesseract()
-        if t is None:
-            print('Tesseract no encontrado. Instálalo antes de ejecutar demo.')
-            sys.exit(1)
-        if generate_sample is None:
-            print('Falta generate_sample (Pillow). No puedo crear imagen generada.')
-            sys.exit(1)
-        img = generate_sample()
-        print('Imagen generada:', img)
-        numbers, text = ocr_to_numbers(img)
-        print('\nTexto extraído:')
-        print(text)
-        print('\nNúmeros detectados:', numbers)
-        estadistica_descriptiva_from_list(numbers)
-        sys.exit(0)
+    try:
+        if '--demo' in sys.argv:
+            print('Demo: OCR 92 estaddsticas (generando imagen de ejemplo)')
+            # Detect tesseract
+            t = find_tesseract()
+            if t is None:
+                print('Tesseract no encontrado. Instlalo antes de ejecutar demo.')
+                sys.exit(1)
+            if generate_sample is None:
+                print('Falta generate_sample (Pillow). No puedo crear imagen generada.')
+                sys.exit(1)
+            img = generate_sample()
+            print('Imagen generada:', img)
+            numbers, text = ocr_to_numbers(img)
+            print('\nTexto extrado:')
+            print(text)
+            print('\nNmeros detectados:', numbers)
+            estadistica_descriptiva_from_list(numbers)
+            sys.exit(0)
 
-    # Si no demo, ejecutar el menú interactivo
-    main()
+        # Si no demo, ejecutar el men interactivo
+        main()
+    except Exception as e:
+        import traceback
+        print("\n[ERROR] Ha ocurrido un error inesperado:\n")
+        traceback.print_exc()
+        print("\nPresiona ENTER para salir...")
+        input()

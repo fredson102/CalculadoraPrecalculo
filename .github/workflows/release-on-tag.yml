@@ -32,8 +32,13 @@ jobs:
       - name: Run tests
         run: python -m pytest -q
 
-      - name: Build executable (PyInstaller)
+      - name: Clean dist folder
+        run: |
+          if exist dist rmdir /s /q dist
+      - name: Build CalculadoraCLI.exe
         run: pyinstaller --noconfirm --onefile --name CalculadoraCLI calculadora_cli.py
+      - name: Build calculadora_cli.exe (compatibilidad)
+        run: pyinstaller --noconfirm --onefile --name calculadora_cli calculadora_cli.py
 
       - name: Create GitHub Release
         id: create_release
@@ -42,17 +47,30 @@ jobs:
           tag_name: ${{ github.ref_name }}
           release_name: ${{ github.ref_name }}
           body: |
-            Release ${{ github.ref_name }} - CalculadoraCLI executable built by CI.
-            Includes a single-file Windows executable `CalculadoraCLI.exe` (OCR requires Tesseract installed on the target machine).
+            Release ${{ github.ref_name }}
+            
+            Incluye los ejecutables Windows:
+            - CalculadoraCLI.exe (principal)
+            - calculadora_cli.exe (compatibilidad)
+            
+            Requiere tener Tesseract instalado para OCR.
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload exe to Release
+      - name: Upload CalculadoraCLI.exe to Release
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: dist/CalculadoraCLI.exe
           asset_name: CalculadoraCLI.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload calculadora_cli.exe to Release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/calculadora_cli.exe
+          asset_name: calculadora_cli.exe
           asset_content_type: application/octet-stream

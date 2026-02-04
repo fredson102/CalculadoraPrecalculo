@@ -31,6 +31,7 @@ Esta carpeta contiene una calculadora educativa con **OCR integrado (pytesseract
    Si no puedes usar winget, descarga el instalador desde:
    https://github.com/tesseract-ocr/tesseract/releases
 
+
 4. Ejecutar demo (genera una imagen de muestra, hace OCR y muestra estadísticas):
 
    ```powershell
@@ -42,6 +43,30 @@ Esta carpeta contiene una calculadora educativa con **OCR integrado (pytesseract
    ```powershell
    .\venv\Scripts\python.exe calculadora.py
    ```
+
+---
+
+## Ejecutable Windows (.exe)
+El workflow de GitHub Actions genera dos ejecutables en cada release:
+
+- `CalculadoraCLI.exe`
+- `calculadora_cli.exe`
+
+Ambos funcionan igual. Descarga cualquiera desde la sección **Releases** en GitHub.
+
+### Uso básico del EXE
+
+```powershell
+CalculadoraCLI.exe demo
+CalculadoraCLI.exe stats -d "1,2,3,4" -o resultados.csv
+CalculadoraCLI.exe stats-image -i sample_numbers.png -o resultados.csv
+CalculadoraCLI.exe interactive
+```
+
+### Si el EXE se cierra inmediatamente o muestra error
+El ejecutable ahora incluye manejo robusto de errores: si ocurre un error inesperado, se mostrará el mensaje y el traceback, y el programa esperará a que presiones ENTER antes de cerrarse. Así puedes ver qué ocurrió y reportar el error.
+
+Si ves un error relacionado con Tesseract, asegúrate de tenerlo instalado y accesible en tu sistema.
 
 ## Archivos importantes
 - `calculadora.py` — Programa principal con opción OCR (5.2) y estadística.
