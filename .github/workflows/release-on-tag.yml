@@ -26,7 +26,7 @@ jobs:
 
       - name: Clean dist folder
         run: |
-          if exist dist rmdir /s /q dist
+          if (Test-Path dist) { Remove-Item -Recurse -Force dist }
           
       - name: Build CalculadoraPro.exe (GUI)
         run: pyinstaller --noconfirm --onefile --windowed --name CalculadoraPro app_gui.py
