@@ -1,58 +1,13 @@
 """
 Calculadora completa: ÁLGEBRA, FUNCIONES, TRIGONOMETRÍA, APLICACIONES y ESTADÍSTICA
-Incluye integración con Tesseract OCR. Ejecuta `python calculadora_completa.py --demo`
-para ejecutar el demo (genera imagen de ejemplo → OCR → estadísticas) y salir.
 """
 
 import math
-import sys
 from collections import Counter
 import numpy as np
 
-# Intentar importar módulos opcionales
-try:
-    import pytesseract
-    from PIL import Image
-except Exception:
-    pytesseract = None
-    Image = None
-
-# Import demo helpers si existen
-try:
-    from generate_sample_image import generate_sample
-except Exception:
-    generate_sample = None
-
 
 # ---------------------- UTILIDADES ----------------------
-
-def find_tesseract():
-    """Detecta la instalación de Tesseract y configura pytesseract si está presente."""
-    possible_paths = [
-        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-    ]
-
-    try:
-        import subprocess
-        proc = subprocess.run(["tesseract", "--version"], capture_output=True, text=True)
-        if proc.returncode == 0:
-            if pytesseract:
-                pytesseract.pytesseract.tesseract_cmd = "tesseract"
-            return "tesseract"
-    except Exception:
-        pass
-
-    for p in possible_paths:
-        try:
-            with open(p, 'rb'):
-                if pytesseract:
-                    pytesseract.pytesseract.tesseract_cmd = p
-                return p
-        except Exception:
-            continue
-
-    return None
 
 
 # ---------------------- ÁLGEBRA ----------------------
@@ -262,19 +217,6 @@ def estadistica_descriptiva_from_list(datos, verbose=True):
     return stats
 
 
-# ---------------------- OCR → ESTADÍSTICA ----------------------
-
-def ocr_to_numbers(img_path):
-    if pytesseract is None or Image is None:
-        raise RuntimeError('pytesseract o PIL no instalados.')
-    img = Image.open(img_path)
-    text = pytesseract.image_to_string(img)
-    import re
-    matches = re.findall(r"[-+]?[0-9]*\.?[0-9]+", text)
-    numbers = [float(m) for m in matches]
-    return numbers, text
-
-
 def save_stats_to_csv(stats, path):
     """Guarda los datos y resumen estadístico en CSV."""
     import csv
@@ -291,36 +233,6 @@ def save_stats_to_csv(stats, path):
     print(f"Guardado en {path}")
 
 
-def ocr_estadistica(img_path=None):
-    print('\nOCR → ESTADÍSTICA')
-    if find_tesseract() is None:
-        print('Tesseract no encontrado. Instala el ejecutable y vuelve a intentarlo.')
-        return
-    if img_path is None:
-        if generate_sample is None:
-            print('No hay función de muestra para generar imagen. Instala Pillow.')
-            return
-        img_path = generate_sample()
-        print('Imagen de muestra generada en:', img_path)
-    numbers, text = ocr_to_numbers(img_path)
-    print('\nTEXTO EXTRAÍDO:')
-    print(text)
-    if not numbers:
-        print('No se detectaron números en la imagen.')
-        return
-    print('Números:', numbers)
-    stats = estadistica_descriptiva_from_list(numbers)
-
-    # Preguntar si guardar
-    guardar = input('\n¿Deseas guardar los resultados a CSV? (S/N): ').strip().lower()
-    if guardar == 's':
-        path = input('Nombre de archivo (ej: resultados.csv): ').strip()
-        if not path:
-            path = 'resultados.csv'
-        save_stats_to_csv(stats, path)
-    return stats
-
-
 # ---------------------- MENÚ COMPLETO ----------------------
 
 def mostrar_menu():
@@ -335,14 +247,12 @@ def mostrar_menu():
     print('3.1 Trigonometría básica')
     print('4.1 Interés compuesto')
     print('5.1 Estadística manual')
-    print('5.2 Estadística desde imagen (OCR)')
-    print('5.3 Exportar datos a CSV (ingresa datos manualmente)')
+    print('5.2 Exportar datos a CSV (ingresa datos manualmente)')
     print('0. Salir')
 
 
 def main():
     print('\n¡BIENVENIDO A LA CALCULADORA COMPLETA!')
-    print('Si quieres demo rápido ejecuta: python calculadora_completa.py --demo')
     while True:
         mostrar_menu()
         opc = input('\nSelecciona opción (ej: 1.1, 5.2, 0): ').strip()
@@ -366,8 +276,6 @@ def main():
         elif opc == '5.1':
             estadistica_descriptiva()
         elif opc == '5.2':
-            ocr_estadistica()
-        elif opc == '5.3':
             datos_str = input('\nIngresa datos separados por comas: ')
             datos = [float(x.strip()) for x in datos_str.split(',') if x.strip()]
             stats = estadistica_descriptiva_from_list(datos)
@@ -382,24 +290,4 @@ def main():
 # ---------------------- EJECUCIÓN / DEMO ----------------------
 
 if __name__ == '__main__':
-    if '--demo' in sys.argv:
-        print('Demo: OCR → estadísticas (generando imagen de ejemplo)')
-        # Detect tesseract
-        t = find_tesseract()
-        if t is None:
-            print('Tesseract no encontrado. Instálalo antes de ejecutar demo.')
-            sys.exit(1)
-        if generate_sample is None:
-            print('Falta generate_sample (Pillow). No puedo crear imagen generada.')
-            sys.exit(1)
-        img = generate_sample()
-        print('Imagen generada:', img)
-        numbers, text = ocr_to_numbers(img)
-        print('\nTexto extraído:')
-        print(text)
-        print('\nNúmeros detectados:', numbers)
-        estadistica_descriptiva_from_list(numbers)
-        sys.exit(0)
-
-    # Si no demo, ejecutar el menú interactivo
     main()
