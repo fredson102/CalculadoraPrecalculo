@@ -21,10 +21,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Tesseract
-        shell: powershell
-        run: choco install -y tesseract --no-progress
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
